@@ -9,10 +9,21 @@ venv/
 .ruff_cache/
 
 # Env / secrets
+#
+# `*.env` matches names ENDING in .env (foo.env); it does NOT match .env.production.
+# Those need their own rule, or a file full of live API keys gets committed.
 .env
 .env.local
 *.env
+.env.*
 !.env.example
+
+# Backend production env holds live API keys and the Firebase private key.
+backend/.env.production
+
+# Frontend production env is the one intentional exception: it contains only the
+# public backend URL, and Vite needs it at build time.
+!frontend/.env.production
 
 # Service-account / private keys — NEVER commit these.
 # Firebase Admin SDK credentials contain an RSA private key that grants full

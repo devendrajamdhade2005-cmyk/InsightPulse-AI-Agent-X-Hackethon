@@ -4,6 +4,12 @@ dist-ssr
 .vercel
 
 # local env files — never commit real values
+#
+# NOTE: `.env.production` is deliberately NOT ignored. It holds only VITE_API_BASE,
+# which is a public backend URL, and Vite auto-loads it during `vite build` — so
+# committing it means Vercel builds correctly with no dashboard configuration.
+# Never put a secret in any VITE_* variable: everything VITE_-prefixed is inlined
+# into the browser bundle and is therefore public by definition.
 .env
 .env.local
 .env.*.local
