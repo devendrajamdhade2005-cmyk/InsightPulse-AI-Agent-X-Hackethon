@@ -6,6 +6,52 @@ frontend needs its URL.
 > **Before you start:** every credential that has been shared in a chat, screenshot
 > or commit must be rotated. Paste only freshly generated values below.
 
+**Live URLs for this project**
+
+| | URL |
+|---|---|
+| Frontend (Vercel) | `https://insightpulse-ai.vercel.app` |
+| Backend (Railway) | `https://insightpulse-ai-production.up.railway.app` |
+
+So the two values that must be set, in full:
+
+```env
+# Vercel  (Project → Settings → Environment Variables)
+VITE_API_BASE=https://insightpulse-ai-production.up.railway.app
+
+# Railway (Variables tab)
+CORS_ORIGINS=https://insightpulse-ai.vercel.app
+```
+
+---
+
+## ⚠ Read this first: which Railway URL to use
+
+Railway gives every service **two** hostnames, and they are not interchangeable.
+
+| Hostname | Reachable from | Use it for |
+|---|---|---|
+| `insightpulse-ai.railway.internal` | **only inside your Railway project** | service→service calls (app → database) |
+| `insightpulse-ai-production.up.railway.app` | **the public internet** | anything a browser talks to |
+
+`*.railway.internal` is Railway's private IPv6 network. A browser cannot resolve
+it, and neither can Vercel — neither is inside your Railway project. Pointing
+`VITE_API_BASE` at the internal host gives you a site that loads but where **every
+API call fails**, with `ERR_NAME_NOT_RESOLVED` in the console and the dashboard
+stuck on "Backend offline".
+
+So: **`VITE_API_BASE` must be the public `*.up.railway.app` domain.**
+
+Get it from Railway → your service → **Settings → Networking → Public Networking →
+Generate Domain**. If nothing is listed there, no public domain exists yet and the
+backend is not reachable from the internet at all.
+
+For this project that domain is already generated:
+
+```
+https://insightpulse-ai-production.up.railway.app
+```
+
 ---
 
 ## 1. Backend → Railway
@@ -35,9 +81,9 @@ APP_ENV=production
 #   python -c "import secrets; print(secrets.token_urlsafe(48))"
 SECRET_KEY=PASTE_A_48_BYTE_RANDOM_STRING
 
-# Add your Vercel domain here AFTER step 2, then redeploy.
+# The BROWSER's origin ? your Vercel domain. Not the backend's own address.
 # No trailing slashes. Comma-separated, no spaces.
-CORS_ORIGINS=https://YOUR-APP.vercel.app
+CORS_ORIGINS=https://insightpulse-ai.vercel.app
 
 ACCESS_TOKEN_TTL_MINUTES=10080
 
@@ -112,7 +158,7 @@ Copy the output verbatim as the value. Do not wrap it in extra quotes.
 ### Verify
 
 ```bash
-curl https://YOUR-RAILWAY-URL/health
+curl https://insightpulse-ai-production.up.railway.app/health
 ```
 
 Check these fields:
@@ -147,8 +193,12 @@ Only one is required. **Settings → Environment Variables**, applied to
 Production, Preview and Development:
 
 ```env
-VITE_API_BASE=https://YOUR-RAILWAY-URL
+VITE_API_BASE=https://insightpulse-ai-production.up.railway.app
 ```
+
+That is the public `*.up.railway.app` domain — **not**
+`insightpulse-ai.railway.internal`, which a browser cannot reach. See the warning
+at the top of this file.
 
 Rules that bite people:
 
@@ -165,13 +215,14 @@ Rules that bite people:
 Go back to Railway and set `CORS_ORIGINS` to your real Vercel domain:
 
 ```env
-CORS_ORIGINS=https://your-app.vercel.app
+CORS_ORIGINS=https://insightpulse-ai.vercel.app
 ```
 
-Include preview domains too if you want them working:
+Vercel also gives every deployment a unique preview URL. Those are separate
+origins, so add them if you want previews working:
 
 ```env
-CORS_ORIGINS=https://your-app.vercel.app,https://your-app-git-main-you.vercel.app
+CORS_ORIGINS=https://insightpulse-ai.vercel.app,https://insightpulse-ai-git-main-devendrajamdhade2005-cmyk.vercel.app
 ```
 
 Redeploy the Railway service. Until you do, the browser will block every API call
@@ -181,7 +232,9 @@ and the dashboard will show "Backend offline".
 
 ## 3. Post-deploy checklist
 
-- [ ] `GET /health` on Railway returns `200` with `store.backend: firestore`
+- [ ] The Railway service has a **public** domain (Settings -> Networking)
+- [ ] `GET https://insightpulse-ai-production.up.railway.app/health` returns `200`
+      with `store.backend: firestore`
 - [ ] No `store.degraded` message in `/health`
 - [ ] Vercel site loads the landing page
 - [ ] `/how-it-works` survives a hard refresh (proves the SPA rewrites work)
@@ -200,6 +253,7 @@ and the dashboard will show "Backend offline".
 | Symptom | Cause |
 |---|---|
 | "Backend offline" in the UI | `VITE_API_BASE` wrong/missing, or the Vercel domain is not in `CORS_ORIGINS` |
+| `ERR_NAME_NOT_RESOLVED` on API calls | `VITE_API_BASE` points at `*.railway.internal`. Use the public `*.up.railway.app` domain |
 | CORS error in console | `CORS_ORIGINS` has a trailing slash, `http://` instead of `https://`, or Railway was not redeployed after the change |
 | 404 on refresh at `/app/...` | Vercel Root Directory is not `frontend`, so `vercel.json` was not picked up |
 | `store.backend: sqlite` when you set Firestore | Read `store.degraded` in `/health` — it names the actual error. Usually malformed `FIREBASE_CREDENTIALS_JSON` |

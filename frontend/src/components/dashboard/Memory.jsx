@@ -2,10 +2,12 @@ import { accentClass, cx, toneClass } from "../../lib/accents.js";
 import { truncate } from "../../lib/format.js";
 import { Badge, Card, MiniLabel, Tag, TagRow } from "../ui/Primitives.jsx";
 import {
+  Ban,
   Brain,
   Building2,
   Check,
   CircleDot,
+  Cpu,
   Loader,
   Microscope,
   Minus,
@@ -250,7 +252,9 @@ export function Memory({ result }) {
       {ctxAgents.length ? (
         <Block label="Context shared with each agent">
           <div className="mt-2 grid gap-2.5 lg:grid-cols-2">
-            {ctxAgents.map((a) => (
+            {ctxAgents.map((a) => {
+              const AgentGlyph = AGENT_ICON[a.agent] || Cpu;
+              return (
               <article
                 key={a.agent}
                 className={cx(
@@ -258,10 +262,19 @@ export function Memory({ result }) {
                   "nb-frame-flat nb-a-border border-l-[6px] bg-surface p-3",
                 )}
               >
-                <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-2 text-[13px] font-bold">
-                  <span>
-                    {a.icon || AGENT_ICON[a.agent] || "•"}{" "}
-                    {a.name || AGENT_NAME[a.agent] || a.agent}
+                <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2 text-[13px] font-bold">
+                  {/* AGENT_ICON holds components, so it must be rendered as an
+                      element. The backend also sends an emoji in `a.icon`; it is
+                      ignored on purpose to keep the UI vector-only. */}
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <AgentGlyph
+                      aria-hidden="true"
+                      className="h-3.5 w-3.5 shrink-0"
+                      strokeWidth={2.4}
+                    />
+                    <span className="truncate">
+                      {a.name || AGENT_NAME[a.agent] || a.agent}
+                    </span>
                   </span>
                   {a.memory_version ? (
                     <span className="text-[10.5px] font-semibold whitespace-nowrap text-ink-4">
@@ -296,12 +309,21 @@ export function Memory({ result }) {
                   </div>
                 ) : null}
                 {(a.context_omitted || []).map((o, i) => (
-                  <p key={i} className="mt-1.5 text-[11.5px] text-ink-4">
-                    ⊘ {o.why}
+                  <p
+                    key={i}
+                    className="mt-1.5 flex items-start gap-1.5 text-[11.5px] text-ink-4"
+                  >
+                    <Ban
+                      aria-hidden="true"
+                      className="mt-0.5 h-3 w-3 shrink-0"
+                      strokeWidth={2.4}
+                    />
+                    {o.why}
                   </p>
                 ))}
               </article>
-            ))}
+              );
+            })}
           </div>
         </Block>
       ) : null}

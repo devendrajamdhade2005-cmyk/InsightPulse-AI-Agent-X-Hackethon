@@ -30,6 +30,7 @@ import { FrameworkView } from "../components/views/FrameworkView.jsx";
 import { EvaluationView } from "../components/views/EvaluationView.jsx";
 import { ObservabilityView } from "../components/views/ObservabilityView.jsx";
 import { ViewHead } from "../components/ui/Primitives.jsx";
+import { Guard } from "../components/ui/ErrorBoundary.jsx";
 
 /* The signed-in workspace.
  *
@@ -246,29 +247,54 @@ export default function Dashboard() {
               </p>
             ) : null}
 
+            {/* Each panel is guarded independently. A bad payload in one of them
+                must never cost the user the scan they just waited for. */}
             {hasRun ? (
               <>
-                <KpiGrid items={kpis} />
-                <ExecutiveSummary
-                  counts={counts}
-                  trend={trend}
-                  nextStep={insights[0]?.recommended_action || ""}
-                  findingCount={findings.length}
-                  fullSummary={(run.summary || "").trim()}
-                  simulated={run.metrics?.simulated_data_used}
-                />
-                <HeroInsight insight={insights[0]} onOpenEvidence={openEvidence} />
-                <AgentTrail
-                  result={run}
-                  multiAgent={<MultiAgent result={run} />}
-                  memory={<Memory result={run} />}
-                />
+                <Guard label="Key metrics">
+                  <KpiGrid items={kpis} />
+                </Guard>
+
+                <Guard label="Executive summary">
+                  <ExecutiveSummary
+                    counts={counts}
+                    trend={trend}
+                    nextStep={insights[0]?.recommended_action || ""}
+                    findingCount={findings.length}
+                    fullSummary={(run.summary || "").trim()}
+                    simulated={run.metrics?.simulated_data_used}
+                  />
+                </Guard>
+
+                <Guard label="Top intelligence">
+                  <HeroInsight insight={insights[0]} onOpenEvidence={openEvidence} />
+                </Guard>
+
+                <Guard label="Agent execution trail">
+                  <AgentTrail
+                    result={run}
+                    multiAgent={
+                      <Guard label="Multi-agent execution">
+                        <MultiAgent result={run} />
+                      </Guard>
+                    }
+                    memory={
+                      <Guard label="Context & memory">
+                        <Memory result={run} />
+                      </Guard>
+                    }
+                  />
+                </Guard>
               </>
             ) : null}
 
             <section>
               <ViewHead title={meta.title} sub={meta.sub} accent={meta.accent} />
-              {renderView()}
+              {/* Keyed on the view so switching sections clears a previous
+                  section's error instead of inheriting it. */}
+              <Guard key={view} label={meta.title}>
+                {renderView()}
+              </Guard>
             </section>
           </div>
         </main>

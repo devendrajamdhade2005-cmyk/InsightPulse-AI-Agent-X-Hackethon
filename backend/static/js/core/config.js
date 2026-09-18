@@ -12,12 +12,17 @@
  * Local development: served by FastAPI at http://localhost:8000, so the hostname
  * is localhost and API_BASE is "" (same-origin). Nothing to configure.
  *
- * Production: the static frontend is hosted on Vercel (a different origin), so it
- * targets the Render backend below. The backend URL is public, not a secret — no
- * API keys are ever placed in frontend code.
+ * Production: this dashboard is served by the backend itself on Railway, so the
+ * hostname check below falls through to PRODUCTION_API_BASE. It must therefore be
+ * the backend's own PUBLIC domain — the private `*.railway.internal` host is not
+ * resolvable from a browser. The backend URL is public, not a secret; no API keys
+ * are ever placed in frontend code.
+ *
+ * The React app in ../../../frontend is a separate deployment and reads its own
+ * VITE_API_BASE. This file only configures this zero-build dashboard.
  */
 
-const PRODUCTION_API_BASE = "https://insightpulse-ai-agent.onrender.com";
+const PRODUCTION_API_BASE = "https://insightpulse-ai-production.up.railway.app";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"]);
 

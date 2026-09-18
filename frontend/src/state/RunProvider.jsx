@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -60,8 +61,16 @@ export function RunProvider({ children }) {
 
   // Holds the live run so setRun can compare run_ids without adding `run` to the
   // callback's dependency list (which would recreate it on every run change).
+  //
+  // Written in an effect rather than during render: a render-phase ref write is
+  // not safe under concurrent rendering, where a render can be started and thrown
+  // away, latching a value that was never committed. setRun is only ever called
+  // from an event handler or an async callback — i.e. after commit — so reading
+  // the committed value here is both correct and what we actually want.
   const runRef = useRef(null);
-  runRef.current = run;
+  useEffect(() => {
+    runRef.current = run;
+  }, [run]);
 
   const setRun = useCallback((result) => {
     const current = runRef.current;

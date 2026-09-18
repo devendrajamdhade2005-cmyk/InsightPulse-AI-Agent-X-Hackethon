@@ -329,13 +329,15 @@ function LandscapePanel({ onSelectTopic }) {
       <PanelHead
         eyebrow="Map"
         title="Research Landscape"
-        sub="Bubble size = volume · colour = growth · click to filter"
+        sub="Sphere size = volume · colour = growth · lines show shared sources"
       />
       {landscape.length >= 2 ? (
         <>
-          <Bubbles items={landscape} onSelect={onSelectTopic} />
+          <Network3D items={landscape} onSelect={onSelectTopic} />
           <Note>
-            Pink = new this window · red/amber = fastest growing · grey = declining
+            Sphere size = volume · colour = growth (pink new, red/amber fastest,
+            grey declining) · a line means the two topics were seen in the same
+            source category
           </Note>
         </>
       ) : (
