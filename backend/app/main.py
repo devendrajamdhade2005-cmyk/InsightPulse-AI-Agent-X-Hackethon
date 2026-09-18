@@ -17,15 +17,32 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .api import guard
+from .api.account import router as account_router
 from .api.agent import router as agent_router
+from .api.auth import router as auth_router
 from .api.evaluation import router as evaluation_router
 from .api.graph import router as graph_router
 from .api.observability import router as observability_router
 from .api.report import router as report_router
+from .auth import firebase as firebase_auth
 from .config import settings
+from .store import store_report
 from .tools.registry import tool_registry
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+
+
+def _safe_store_report() -> dict:
+    """Store status that can never fail the health check.
+
+    The platform uses /health for liveness. If reporting on the datastore could
+    raise, an unreachable Firestore would take the whole container down instead of
+    degrading to SQLite, which is the opposite of the intended behaviour.
+    """
+    try:
+        return store_report()
+    except Exception as exc:  # pragma: no cover - defensive
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
 
 # Responses that must never be cached by a CDN or browser, because they reflect
 # live run state. Vercel proxies the frontend, not these, but a stale 200 from an
@@ -47,8 +64,12 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
+        # Sessions are carried in an Authorization header, not a cookie, so
+        # credentialed requests are unnecessary — and leaving this false keeps the
+        # wildcard-origin footgun out of reach.
         allow_credentials=False,
-        allow_methods=["GET", "POST", "OPTIONS"],
+        # PATCH and DELETE were added for profile edits and history deletion.
+        allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
 
@@ -79,6 +100,8 @@ def create_app() -> FastAPI:
             response.headers.setdefault("Cache-Control", "no-store")
         return response
 
+    app.include_router(auth_router)
+    app.include_router(account_router)
     app.include_router(agent_router)
     app.include_router(graph_router)
     app.include_router(evaluation_router)
@@ -101,6 +124,12 @@ def create_app() -> FastAPI:
                 "auth": "token required" if settings.agent_api_token else "open (local demo)",
                 # What protects the run endpoints when no token is configured.
                 "limits": guard.status_report(),
+                # Identity and persistence state. Reported so a misconfiguration —
+                # Firestore requested but unreachable, or Firebase Auth silently
+                # degraded to local passwords — is visible instead of assumed.
+                "identity": settings.auth_report(),
+                "firebase": firebase_auth.status(),
+                "store": _safe_store_report(),
             }
         )
 

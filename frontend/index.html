@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>InsightPulse AI — Research &amp; Competitive Intelligence</title>
+    <meta
+      name="description"
+      content="Autonomous research and competitor intelligence agent. Gathers evidence from papers, patents, competitor activity, news and the live web, then reports only what matters."
+    />
+    <meta name="color-scheme" content="light dark" />
+
+    <!--
+      Theme is applied before first paint so a dark-mode user never sees a white
+      flash. Mirrors the logic in src/state/ThemeProvider.jsx.
+    -->
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("ip.theme");
+          var dark =
+            saved === "dark" ||
+            (!saved &&
+              window.matchMedia &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          if (dark) document.documentElement.classList.add("dark");
+        } catch (e) {
+          /* private mode — fall back to light */
+        }
+      })();
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

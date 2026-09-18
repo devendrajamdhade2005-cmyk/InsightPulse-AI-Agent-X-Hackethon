@@ -114,6 +114,37 @@ class Settings(BaseSettings):
     # /api/agent/run spends LLM quota and makes outbound requests on demand.
     agent_api_token: str = ""
 
+    # ── identity & persistence ──────────────────────────────
+    # Firebase Admin credentials. Server-side only: this key grants full project
+    # access, so it is never sent to a client and never written into a trace.
+    firebase_enabled: bool = False
+    firebase_project_id: str = ""
+    firebase_credentials_file: str = ""
+    # Inline JSON alternative for platforms that only offer env vars (Render,
+    # Vercel functions) where writing a key file is awkward.
+    firebase_credentials_json: str = ""
+
+    # Firestore holds accounts, profiles and scan history. When off, the SQLite
+    # store above is used instead, so the app still works fully offline.
+    firestore_enabled: bool = False
+
+    # Required for email/password sign-in. The Admin SDK can create a user but has
+    # no password-verification API — that lives in the Identity Toolkit REST API,
+    # which is keyed by the project's Web API key. Without it we fall back to
+    # locally-hashed passwords.
+    firebase_web_api_key: str = ""
+
+    # Auth policy
+    password_min_length: int = 8
+    # Registration is open by default for the demo. Set to false to lock signups.
+    allow_registration: bool = True
+    # Login attempts per IP per window, independent of the run limiter so a brute
+    # force cannot be masked by ordinary read traffic.
+    login_rate_limit_attempts: int = 10
+    login_rate_limit_window_seconds: int = 300
+    # How many completed scans to retain per user.
+    history_retention_per_user: int = 100
+
     # ── demo ────────────────────────────────────────────────
     seed_on_startup: bool = True
     demo_user_email: str = "analyst@insightpulse.dev"
@@ -170,6 +201,71 @@ class Settings(BaseSettings):
     @property
     def is_sqlite(self) -> bool:
         return self.database_url.startswith("sqlite")
+
+    # ── identity (derived) ──────────────────────────────────
+    def firebase_credentials_path(self) -> Path | None:
+        """Absolute path to the service-account file, if one is configured.
+
+        Relative paths resolve against the backend directory, so the same value
+        works regardless of the working directory uvicorn was started from.
+        """
+        raw = (self.firebase_credentials_file or "").strip()
+        if not raw:
+            return None
+        p = Path(raw)
+        if not p.is_absolute():
+            p = (BASE_DIR / p).resolve()
+        return p if p.is_file() else None
+
+    @property
+    def firebase_configured(self) -> bool:
+        """True when Admin SDK credentials are actually available."""
+        if not self.firebase_enabled:
+            return False
+        return bool(
+            self.firebase_credentials_path()
+            or (self.firebase_credentials_json or "").strip()
+        )
+
+    @property
+    def password_auth_mode(self) -> str:
+        """Which backend verifies a password.
+
+        `firebase` requires both Admin credentials (to manage the user) and the Web
+        API key (to check the password). With only one of the two we would create
+        accounts nobody could sign in to, so both are required before claiming it.
+        """
+        if self.firebase_configured and (self.firebase_web_api_key or "").strip():
+            return "firebase"
+        return "local"
+
+    @property
+    def store_backend(self) -> str:
+        """Which persistence layer is active."""
+        if self.firestore_enabled and self.firebase_configured:
+            return "firestore"
+        return "sqlite"
+
+    def auth_report(self) -> dict[str, object]:
+        """Honest summary of the identity setup. Contains no secrets."""
+        mode = self.password_auth_mode
+        return {
+            "password_verification": mode,
+            "firebase_admin": self.firebase_configured,
+            "firebase_project": self.firebase_project_id or None,
+            "firebase_web_api_key_set": bool((self.firebase_web_api_key or "").strip()),
+            "accepts_firebase_id_tokens": self.firebase_configured,
+            "store": self.store_backend,
+            "registration_open": self.allow_registration,
+            # Say plainly why the weaker path is in use, rather than implying
+            # Firebase Auth is active when it is not.
+            "note": (
+                "Passwords are verified by Firebase Identity Toolkit."
+                if mode == "firebase"
+                else "FIREBASE_WEB_API_KEY is not set, so passwords are verified "
+                "against a locally-stored bcrypt hash."
+            ),
+        }
 
     def resolved_database_url(self) -> str:
         """Make relative SQLite paths absolute so CWD never matters."""
